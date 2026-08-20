@@ -7,7 +7,7 @@ import requests
 @dataclass
 class OpenRouterClient:
     api_key: str
-    model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
+    model: str = "poolside/laguna-s-2.1:free"
     base_url: str = "https://openrouter.ai/api/v1/chat/completions"
     timeout: int = 60
 
@@ -36,6 +36,10 @@ class OpenRouterClient:
             },
             timeout=self.timeout,
         )
-        response.raise_for_status()
+        if not response.ok:
+            raise RuntimeError(
+                "OpenRouter API request failed "
+                f"with status {response.status_code}: {response.text}"
+            )
         data = response.json()
         return data["choices"][0]["message"]["content"]
