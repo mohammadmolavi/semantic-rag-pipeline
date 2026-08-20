@@ -9,18 +9,12 @@ from rag.langchain_rag import (
     split_document_text,
 )
 from rag.llm import OpenRouterClient
-from rag.loaders import load_docx, load_text_file
+from rag.loaders import load_document
 
 try:
     from dotenv import load_dotenv
 except ImportError:
     load_dotenv = None
-
-
-def load_document(path: str) -> str:
-    if path.lower().endswith(".docx"):
-        return load_docx(path)
-    return load_text_file(path)
 
 
 def main() -> None:

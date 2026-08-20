@@ -15,6 +15,15 @@ DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/ro
 DEFAULT_COLLECTION_NAME = "roshan_rag_chunks"
 
 
+def langchain_database_url(database_url: str | None = None) -> str:
+    url = database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://") :]
+    return url
+
+
 PROMPT = ChatPromptTemplate.from_messages(
     [
         (
@@ -54,7 +63,7 @@ def build_vector_store(
     return PGVector(
         embeddings=embeddings,
         collection_name=collection_name,
-        connection=database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL),
+        connection=langchain_database_url(database_url),
         use_jsonb=True,
     )
 
@@ -76,6 +85,10 @@ def split_document_text(
     return documents
 
 
+def chunk_ids_for_source(source: str, chunk_count: int) -> list[str]:
+    return [f"{source}:{index}" for index in range(chunk_count)]
+
+
 def add_documents_to_vector_store(vector_store, documents: list[Document]) -> None:
     if not documents:
         return
@@ -85,6 +98,18 @@ def add_documents_to_vector_store(vector_store, documents: list[Document]) -> No
         for document in documents
     ]
     vector_store.add_documents(documents, ids=ids)
+
+
+def delete_source_chunks(vector_store, source: str, chunk_count: int) -> None:
+    ids = chunk_ids_for_source(source, chunk_count)
+    if ids:
+        vector_store.delete(ids)
+
+
+def index_text(vector_store, text: str, source: str) -> int:
+    documents = split_document_text(text, source=source)
+    add_documents_to_vector_store(vector_store, documents)
+    return len(documents)
 
 
 def build_retriever(

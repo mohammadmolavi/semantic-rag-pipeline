@@ -1,0 +1,11 @@
+.env
+.venv
+.idea
+.codex
+.git
+__pycache__
+media
+staticfiles
+ownCloud.pdf
+*.pyc
+.cache

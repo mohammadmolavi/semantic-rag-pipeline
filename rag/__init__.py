@@ -4,6 +4,8 @@ from .langchain_rag import (
     add_documents_to_vector_store,
     build_retriever,
     build_vector_store,
+    chunk_ids_for_source,
+    langchain_database_url,
     split_document_text,
 )
 from .pipeline import RagAnswer, RagPipeline
@@ -19,6 +21,8 @@ __all__ = [
     "add_documents_to_vector_store",
     "build_retriever",
     "build_vector_store",
+    "chunk_ids_for_source",
+    "langchain_database_url",
     "split_document_text",
     "split_text",
 ]

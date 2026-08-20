@@ -4,3 +4,7 @@ ownCloud.pdf
 .idea
 .codex
 __pycache__/
+media/
+staticfiles/
+db.sqlite3
+.cache/

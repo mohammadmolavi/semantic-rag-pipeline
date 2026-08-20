@@ -15,5 +15,27 @@ services:
       timeout: 5s
       retries: 10
 
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/roshan_rag
+      DJANGO_ALLOWED_HOSTS: "*"
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:8000,http://127.0.0.1:8000
+      DJANGO_SUPERUSER_USERNAME: admin
+      DJANGO_SUPERUSER_PASSWORD: admin
+      DJANGO_SUPERUSER_EMAIL: admin@example.com
+    volumes:
+      - media_data:/app/media
+      - huggingface_cache:/app/.cache/huggingface
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  media_data:
+  huggingface_cache:
