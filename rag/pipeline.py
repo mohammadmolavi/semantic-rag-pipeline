@@ -1,7 +1,8 @@
 from dataclasses import dataclass
+from typing import Protocol
 
 from .llm import OpenRouterClient
-from .retrieval import DocumentChunk, KeywordRetriever
+from .retrieval import DocumentChunk
 
 
 SYSTEM_PROMPT = """You are a Persian RAG assistant.
@@ -16,8 +17,13 @@ class RagAnswer:
     sources: list[DocumentChunk]
 
 
+class Retriever(Protocol):
+    def search(self, query: str, *, top_k: int = 4) -> list[DocumentChunk]:
+        pass
+
+
 class RagPipeline:
-    def __init__(self, retriever: KeywordRetriever, llm: OpenRouterClient) -> None:
+    def __init__(self, retriever: Retriever, llm: OpenRouterClient) -> None:
         self.retriever = retriever
         self.llm = llm
 

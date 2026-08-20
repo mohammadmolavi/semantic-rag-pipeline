@@ -1,0 +1,6 @@
+.env
+ownCloud.pdf
+.venv
+.idea
+.codex
+__pycache__/
