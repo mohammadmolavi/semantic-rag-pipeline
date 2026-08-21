@@ -12,6 +12,7 @@ from langchain_text_splitters import (
 from .embeddings import SentenceTransformerEmbedder
 from .hybrid import HybridRetriever
 from .llm import OpenRouterClient
+from .reranking import CrossEncoderReranker
 
 
 DEFAULT_DATABASE_URL = (
@@ -261,22 +262,23 @@ def build_retriever(
     source: str | None = None,
     top_k: int = 4,
     lexical_documents: list[Document] | None = None,
+    reranker: CrossEncoderReranker | None = None,
 ) -> HybridRetriever:
+    candidate_count = max(
+        top_k * 3,
+        12,
+    )
+
     return HybridRetriever(
         vector_store,
         lexical_documents=lexical_documents,
         source=source,
-        vector_k=max(
-            top_k * 3,
-            12,
-        ),
-        lexical_k=max(
-            top_k * 3,
-            12,
-        ),
+        vector_k=candidate_count,
+        lexical_k=candidate_count,
         final_k=top_k,
+        reranker=reranker,
+        rerank_k=candidate_count,
     )
-
 
 class LangChainRagPipeline:
     def __init__(

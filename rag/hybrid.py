@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
 from .retrieval import tokenize
+from .reranking import CrossEncoderReranker
 
 
 class HybridRetriever:
@@ -25,6 +26,8 @@ class HybridRetriever:
         rrf_k: int = 60,
         vector_weight: float = 0.6,
         lexical_weight: float = 0.4,
+        reranker: CrossEncoderReranker | None = None,
+        rerank_k: int = 12,
     ) -> None:
         if rrf_k <= 0:
             raise ValueError(
@@ -39,6 +42,11 @@ class HybridRetriever:
         if vector_weight == 0 and lexical_weight == 0:
             raise ValueError(
                 "At least one retrieval weight must be positive."
+            )
+
+        if rerank_k <= 0:
+            raise ValueError(
+                "rerank_k must be greater than zero."
             )
 
         self.vector_store = vector_store
@@ -61,6 +69,13 @@ class HybridRetriever:
 
         self.lexical_weight = lexical_weight
 
+        self.reranker = reranker
+
+        self.rerank_k = max(
+            rerank_k,
+            final_k,
+        )
+
     def invoke(
         self,
         question: str,
@@ -78,11 +93,21 @@ class HybridRetriever:
             lexical_documents,
         )
 
-        return [
+        candidates = [
             document
             for document, _ in ranked_documents[
-                : self.final_k
+                : self.rerank_k
             ]
+        ]
+
+        if self.reranker is not None:
+            candidates = self.reranker.rerank(
+                question,
+                candidates,
+            )
+
+        return candidates[
+            : self.final_k
         ]
 
     def _vector_search(

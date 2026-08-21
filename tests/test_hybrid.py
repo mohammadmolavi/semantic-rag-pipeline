@@ -4,6 +4,8 @@ from langchain_core.documents import Document
 
 from rag.hybrid import HybridRetriever
 
+from unittest.mock import Mock
+
 
 class FakeVectorStore:
     def __init__(
@@ -659,3 +661,105 @@ class HybridRetrieverTests(
                         ),
                         **settings,
                     )
+    def test_reranker_receives_rrf_candidates_before_final_cutoff(
+        self,
+    ) -> None:
+        documents = [
+            self.make_document(
+                f"Candidate {index}.",
+                f"document:{40 + index}",
+            )
+            for index in range(
+                3
+            )
+        ]
+
+        reranker = Mock()
+
+        reranker.rerank.return_value = list(
+            reversed(
+                documents
+            )
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                documents
+            ),
+            lexical_documents=[],
+            reranker=reranker,
+            rerank_k=3,
+            final_k=1,
+        )
+
+        results = retriever.invoke(
+            "candidate"
+        )
+
+        reranker.rerank.assert_called_once_with(
+            "candidate",
+            documents,
+        )
+
+        self.assertEqual(
+            results,
+            [
+                documents[2],
+            ],
+        )
+
+    def test_reranker_candidate_limit_is_respected(
+        self,
+    ) -> None:
+        documents = [
+            self.make_document(
+                f"Candidate {index}.",
+                f"document:{50 + index}",
+            )
+            for index in range(
+                4
+            )
+        ]
+
+        reranker = Mock()
+
+        reranker.rerank.side_effect = (
+            lambda question, candidates: candidates
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                documents
+            ),
+            lexical_documents=[],
+            reranker=reranker,
+            rerank_k=2,
+            final_k=2,
+        )
+
+        results = retriever.invoke(
+            "candidate"
+        )
+
+        reranker.rerank.assert_called_once_with(
+            "candidate",
+            documents[:2],
+        )
+
+        self.assertEqual(
+            results,
+            documents[:2],
+        )
+
+    def test_invalid_rerank_candidate_limit_is_rejected(
+        self,
+    ) -> None:
+        with self.assertRaises(
+            ValueError
+        ):
+            HybridRetriever(
+                FakeVectorStore(
+                    []
+                ),
+                rerank_k=0,
+            )

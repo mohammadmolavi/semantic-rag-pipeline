@@ -10,6 +10,7 @@ from rag.langchain_rag import (
 )
 from rag.llm import OpenRouterClient
 from rag.loaders import load_document
+from rag.reranking import CrossEncoderReranker
 
 try:
     from dotenv import load_dotenv
@@ -41,6 +42,7 @@ def main() -> None:
         source=args.document,
         top_k=args.top_k,
         lexical_documents=documents,
+        reranker=CrossEncoderReranker.from_env(),
     )
     pipeline = LangChainRagPipeline(retriever, OpenRouterClient.from_env())
     result = pipeline.ask(args.question)

@@ -15,6 +15,7 @@ from .langchain_rag import (
 )
 
 from .llm import OpenRouterClient
+from .reranking import CrossEncoderReranker
 
 
 @lru_cache(maxsize=1)
@@ -27,6 +28,12 @@ def get_vector_store():
     return build_vector_store(
         get_embedder()
     )
+
+@lru_cache(
+    maxsize=1
+)
+def get_reranker() -> CrossEncoderReranker | None:
+    return CrossEncoderReranker.from_env()
 
 
 def reindex_source(
@@ -146,6 +153,7 @@ def ask_question(
         lexical_documents=(
             lexical_documents
         ),
+        reranker=get_reranker(),
     )
 
     pipeline = LangChainRagPipeline(
@@ -160,25 +168,12 @@ def ask_question(
 
 def serialize_sources(
     documents: list[Document],
-) -> list[dict[str, object]]:
-    ordered_documents = sorted(
-        documents,
-        key=lambda document: (
-            str(
-                document.metadata.get(
-                    "source",
-                    "",
-                )
-            ),
-            int(
-                document.metadata.get(
-                    "chunk_index",
-                    0,
-                )
-            ),
-        ),
-    )
-
+) -> list[
+    dict[
+        str,
+        object,
+    ]
+]:
     return [
         {
             "chunk_index": (
@@ -200,5 +195,5 @@ def serialize_sources(
                 )
             ),
         }
-        for document in ordered_documents
+        for document in documents
     ]
