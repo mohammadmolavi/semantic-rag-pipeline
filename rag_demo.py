@@ -36,7 +36,12 @@ def main() -> None:
     embeddings = SentenceTransformerEmbedder(args.model)
     vector_store = build_vector_store(embeddings)
     add_documents_to_vector_store(vector_store, documents)
-    retriever = build_retriever(vector_store, source=args.document, top_k=args.top_k)
+    retriever = build_retriever(
+        vector_store,
+        source=args.document,
+        top_k=args.top_k,
+        lexical_documents=documents,
+    )
     pipeline = LangChainRagPipeline(retriever, OpenRouterClient.from_env())
     result = pipeline.ask(args.question)
 

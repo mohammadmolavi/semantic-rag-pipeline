@@ -1,77 +1,212 @@
-"""Hybrid retrieval + lightweight reranking utilities."""
+"""Hybrid semantic and independent BM25 document retrieval."""
 
 from __future__ import annotations
 
 from collections import defaultdict
 
 from langchain_core.documents import Document
+from rank_bm25 import BM25Okapi
+
+from .retrieval import tokenize
 
 
 class HybridRetriever:
-    """Combine vector similarity and lexical matching, then rerank.
-
-    The class keeps the same interface used by LangChain's retrievers:
-    pipeline code can call invoke(question).
-    """
+    """Combine vector search with an independent BM25 corpus search."""
 
     def __init__(
         self,
         vector_store,
         *,
+        lexical_documents: list[Document] | None = None,
         source: str | None = None,
         vector_k: int = 12,
+        lexical_k: int = 12,
         final_k: int = 4,
     ) -> None:
         self.vector_store = vector_store
+        self.lexical_documents = list(lexical_documents or [])
         self.source = source
         self.vector_k = vector_k
+        self.lexical_k = lexical_k
         self.final_k = final_k
 
     def invoke(self, question: str) -> list[Document]:
-        vector_docs = self._vector_search(question)
-        lexical_docs = self._keyword_search(question, vector_docs)
+        vector_documents = self._vector_search(question)
 
-        ranked = self._merge_scores(vector_docs, lexical_docs)
-        return [doc for doc, _ in ranked[: self.final_k]]
+        lexical_documents = self._bm25_search(question)
+
+        ranked_documents = self._merge_scores(
+            vector_documents,
+            lexical_documents,
+        )
+
+        return [
+            document
+            for document, _ in ranked_documents[: self.final_k]
+        ]
 
     def _vector_search(self, question: str) -> list[Document]:
-        kwargs = {"k": self.vector_k}
+        search_kwargs = {
+            "k": self.vector_k,
+        }
+
         if self.source:
-            kwargs["filter"] = {"source": self.source}
-        return self.vector_store.similarity_search(question, **kwargs)
+            search_kwargs["filter"] = {
+                "source": self.source,
+            }
 
-    def _keyword_search(self, question: str, docs: list[Document]):
-        query_terms = set(self._tokens(question))
-        scored = []
-        for doc in docs:
-            text_terms = set(self._tokens(doc.page_content))
-            overlap = len(query_terms & text_terms)
-            scored.append((doc, overlap / max(len(query_terms), 1)))
-        return sorted(scored, key=lambda item: item[1], reverse=True)
+        return self.vector_store.similarity_search(
+            question,
+            **search_kwargs,
+        )
 
-    def _merge_scores(self, vector_docs, lexical_docs):
-        scores = defaultdict(float)
+    def _bm25_search(
+        self,
+        question: str,
+    ) -> list[tuple[Document, float]]:
+        query_tokens = tokenize(question)
 
-        for index, doc in enumerate(vector_docs):
-            scores[self._key(doc)] += 1 / (index + 1) * 0.6
+        if not query_tokens:
+            return []
 
-        for index, (doc, score) in enumerate(lexical_docs):
-            scores[self._key(doc)] += score * 0.4
+        prepared_documents: list[Document] = []
 
-        lookup = {self._key(doc): doc for doc in vector_docs}
+        tokenized_corpus: list[list[str]] = []
+
+        for document in self.lexical_documents:
+            document_source = document.metadata.get(
+                "source"
+            )
+
+            if self.source and document_source != self.source:
+                continue
+
+            document_tokens = tokenize(
+                document.page_content
+            )
+
+            if not document_tokens:
+                continue
+
+            prepared_documents.append(
+                document
+            )
+
+            tokenized_corpus.append(
+                document_tokens
+            )
+
+        if not prepared_documents:
+            return []
+
+        bm25 = BM25Okapi(
+            tokenized_corpus
+        )
+
+        raw_scores = bm25.get_scores(
+            query_tokens
+        )
+
+        query_terms = set(
+            query_tokens
+        )
+
+        matched_documents = [
+            (
+                document,
+                float(score),
+            )
+            for document, document_tokens, score in zip(
+                prepared_documents,
+                tokenized_corpus,
+                raw_scores,
+                strict=True,
+            )
+            if query_terms.intersection(
+                document_tokens
+            )
+        ]
+
+        matched_documents.sort(
+            key=lambda item: item[1],
+            reverse=True,
+        )
+
+        return matched_documents[
+            : self.lexical_k
+        ]
+
+    def _merge_scores(
+        self,
+        vector_documents: list[Document],
+        lexical_documents: list[
+            tuple[Document, float]
+        ],
+    ) -> list[tuple[Document, float]]:
+        scores: dict[
+            tuple[object, object],
+            float,
+        ] = defaultdict(float)
+
+        document_lookup: dict[
+            tuple[object, object],
+            Document,
+        ] = {}
+
+        for rank, document in enumerate(
+            vector_documents,
+            start=1,
+        ):
+            key = self._key(
+                document
+            )
+
+            document_lookup[key] = document
+
+            scores[key] += (
+                0.6 / rank
+            )
+
+        for rank, (document, _) in enumerate(
+            lexical_documents,
+            start=1,
+        ):
+            key = self._key(
+                document
+            )
+
+            document_lookup.setdefault(
+                key,
+                document,
+            )
+
+            scores[key] += (
+                0.4 / rank
+            )
+
+        ranked_documents = [
+            (
+                document_lookup[key],
+                score,
+            )
+            for key, score in scores.items()
+        ]
+
         return sorted(
-            [(lookup[key], score) for key, score in scores.items() if key in lookup],
+            ranked_documents,
             key=lambda item: item[1],
             reverse=True,
         )
 
     @staticmethod
-    def _tokens(text: str):
-        return [x.lower() for x in text.split() if x.strip()]
-
-    @staticmethod
-    def _key(doc: Document):
+    def _key(
+        document: Document,
+    ) -> tuple[object, object]:
         return (
-            doc.metadata.get("source"),
-            doc.metadata.get("chunk_index"),
+            document.metadata.get(
+                "source"
+            ),
+            document.metadata.get(
+                "chunk_index"
+            ),
         )
