@@ -9,7 +9,7 @@ def validate_document_file(upload) -> None:
     name = getattr(upload, "name", "")
     suffix = f".{name.rsplit('.', 1)[-1].lower()}" if "." in name else ""
     if suffix not in SUPPORTED_SUFFIXES:
-        raise ValidationError("Only .docx and .txt files are supported.")
+        raise ValidationError("Only .docx, .txt and .pdf files are supported.")
 
 
 class Document(models.Model):

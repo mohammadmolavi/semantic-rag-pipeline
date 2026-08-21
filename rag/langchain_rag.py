@@ -82,9 +82,10 @@ def split_document_text(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
-    documents = splitter.create_documents([text], metadatas=[{"source": source}])
+    documents = splitter.create_documents([text], metadatas=[{"source": source, "document_name": Path(source).name}])
     for index, document in enumerate(documents):
         document.metadata["chunk_index"] = index
+        document.metadata["citation"] = f"{document.metadata.get('document_name', source)} - chunk {index}"
     return documents
 
 

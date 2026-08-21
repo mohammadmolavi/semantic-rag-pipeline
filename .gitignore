@@ -8,3 +8,4 @@ media/
 staticfiles/
 db.sqlite3
 .cache/
+./sample_data/.~lock.neural_radiance_fields.docx#

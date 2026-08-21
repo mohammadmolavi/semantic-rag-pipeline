@@ -56,6 +56,7 @@ def serialize_sources(documents: list[Document]) -> list[dict[str, object]]:
             "chunk_index": document.metadata.get("chunk_index"),
             "source": document.metadata.get("source"),
             "content": document.page_content,
+            "citation": document.metadata.get("citation"),
         }
         for document in documents
     ]
