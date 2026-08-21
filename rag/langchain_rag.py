@@ -7,8 +7,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from rag.hybrid import HybridRetriever
 from .embeddings import SentenceTransformerEmbedder
 from .llm import OpenRouterClient
+from .hybrid import HybridRetriever
 
 
 DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5432/roshan_rag"
@@ -133,11 +135,16 @@ def build_retriever(
     *,
     source: str | None = None,
     top_k: int = 4,
-) -> VectorStoreRetriever:
+) -> HybridRetriever:
     search_kwargs: dict[str, object] = {"k": top_k}
     if source:
         search_kwargs["filter"] = {"source": source}
-    return vector_store.as_retriever(search_kwargs=search_kwargs)
+    return HybridRetriever(
+        vector_store,
+        source=source,
+        vector_k=max(top_k * 3, 12),
+        final_k=top_k,
+    )
 
 
 class LangChainRagPipeline:
