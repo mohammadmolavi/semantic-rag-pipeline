@@ -28,13 +28,16 @@ PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "You are a Persian RAG assistant. Answer only from the provided "
-            "context. If the context is not enough, say the uploaded documents "
-            "do not contain enough information. Cite chunk numbers.",
+            "You are a Persian RAG assistant. Write only the final answer in "
+            "Persian. Do not write analysis, thinking, English, or source JSON. "
+            "Use only the provided context. If the context is not enough, say "
+            "the uploaded documents do not contain enough information. Cite "
+            "chunk numbers in the Persian answer, for example (بخش ۰).",
         ),
         (
             "user",
-            "Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer in Persian.",
+            "Context:\n{context}\n\nQuestion:\n{question}\n\n"
+            "Write the Persian answer only.",
         ),
     ]
 )
@@ -112,6 +115,18 @@ def index_text(vector_store, text: str, source: str) -> int:
     return len(documents)
 
 
+def dedupe_documents(documents: list[Document]) -> list[Document]:
+    unique: list[Document] = []
+    seen: set[str] = set()
+    for document in documents:
+        key = " ".join(document.page_content.split())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(document)
+    return unique
+
+
 def build_retriever(
     vector_store,
     *,
@@ -130,7 +145,8 @@ class LangChainRagPipeline:
         self.llm = llm
 
     def ask(self, question: str) -> LangChainRagAnswer:
-        documents = self.retriever.invoke(question)
+        documents = dedupe_documents(self.retriever.invoke(question))
+        documents = documents[:4]
         prompt_value = PROMPT.invoke(
             {
                 "context": self._format_documents(documents),

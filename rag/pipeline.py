@@ -6,9 +6,11 @@ from .retrieval import DocumentChunk
 
 
 SYSTEM_PROMPT = """You are a Persian RAG assistant.
+Write only the final answer in Persian.
+Do not write analysis, thinking, English, or source JSON.
 Answer only from the provided context.
 If the context is not enough, say that the uploaded documents do not contain enough information.
-Keep the answer concise and cite the used chunk numbers."""
+Keep the answer concise and cite chunk numbers, for example (بخش ۰)."""
 
 
 @dataclass(frozen=True)
@@ -45,4 +47,4 @@ class RagPipeline:
 Question:
 {question}
 
-Answer in Persian."""
+Write the Persian answer only."""

@@ -44,7 +44,8 @@ def ask_question(
     source: str | None = None,
     top_k: int = 4,
 ) -> LangChainRagAnswer:
-    retriever = build_retriever(get_vector_store(), source=source, top_k=top_k)
+    fetch_k = top_k if source else max(top_k * 2, 8)
+    retriever = build_retriever(get_vector_store(), source=source, top_k=fetch_k)
     pipeline = LangChainRagPipeline(retriever, OpenRouterClient.from_env())
     return pipeline.ask(question)
 

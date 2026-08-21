@@ -5,6 +5,7 @@ from .langchain_rag import (
     build_retriever,
     build_vector_store,
     chunk_ids_for_source,
+    dedupe_documents,
     langchain_database_url,
     split_document_text,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "build_retriever",
     "build_vector_store",
     "chunk_ids_for_source",
+    "dedupe_documents",
     "langchain_database_url",
     "split_document_text",
     "split_text",
