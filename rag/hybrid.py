@@ -1,4 +1,4 @@
-"""Hybrid semantic and independent BM25 document retrieval."""
+"""Hybrid semantic and BM25 retrieval with reciprocal rank fusion."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .retrieval import tokenize
 
 
 class HybridRetriever:
-    """Combine vector search with an independent BM25 corpus search."""
+    """Combine semantic and BM25 rankings using weighted RRF."""
 
     def __init__(
         self,
@@ -22,30 +22,73 @@ class HybridRetriever:
         vector_k: int = 12,
         lexical_k: int = 12,
         final_k: int = 4,
+        rrf_k: int = 60,
+        vector_weight: float = 0.6,
+        lexical_weight: float = 0.4,
     ) -> None:
+        if rrf_k <= 0:
+            raise ValueError(
+                "rrf_k must be greater than zero."
+            )
+
+        if vector_weight < 0 or lexical_weight < 0:
+            raise ValueError(
+                "Retrieval weights cannot be negative."
+            )
+
+        if vector_weight == 0 and lexical_weight == 0:
+            raise ValueError(
+                "At least one retrieval weight must be positive."
+            )
+
         self.vector_store = vector_store
-        self.lexical_documents = list(lexical_documents or [])
+
+        self.lexical_documents = list(
+            lexical_documents or []
+        )
+
         self.source = source
+
         self.vector_k = vector_k
+
         self.lexical_k = lexical_k
+
         self.final_k = final_k
 
-    def invoke(self, question: str) -> list[Document]:
-        vector_documents = self._vector_search(question)
+        self.rrf_k = rrf_k
 
-        lexical_documents = self._bm25_search(question)
+        self.vector_weight = vector_weight
 
-        ranked_documents = self._merge_scores(
+        self.lexical_weight = lexical_weight
+
+    def invoke(
+        self,
+        question: str,
+    ) -> list[Document]:
+        vector_documents = self._vector_search(
+            question
+        )
+
+        lexical_documents = self._bm25_search(
+            question
+        )
+
+        ranked_documents = self._reciprocal_rank_fusion(
             vector_documents,
             lexical_documents,
         )
 
         return [
             document
-            for document, _ in ranked_documents[: self.final_k]
+            for document, _ in ranked_documents[
+                : self.final_k
+            ]
         ]
 
-    def _vector_search(self, question: str) -> list[Document]:
+    def _vector_search(
+        self,
+        question: str,
+    ) -> list[Document]:
         search_kwargs = {
             "k": self.vector_k,
         }
@@ -63,8 +106,15 @@ class HybridRetriever:
     def _bm25_search(
         self,
         question: str,
-    ) -> list[tuple[Document, float]]:
-        query_tokens = tokenize(question)
+    ) -> list[
+        tuple[
+            Document,
+            float,
+        ]
+    ]:
+        query_tokens = tokenize(
+            question
+        )
 
         if not query_tokens:
             return []
@@ -136,53 +186,90 @@ class HybridRetriever:
             : self.lexical_k
         ]
 
-    def _merge_scores(
+    def _reciprocal_rank_fusion(
         self,
         vector_documents: list[Document],
         lexical_documents: list[
-            tuple[Document, float]
+            tuple[
+                Document,
+                float,
+            ]
         ],
-    ) -> list[tuple[Document, float]]:
-        scores: dict[
-            tuple[object, object],
+    ) -> list[
+        tuple[
+            Document,
             float,
-        ] = defaultdict(float)
+        ]
+    ]:
+        scores: dict[
+            tuple[
+                object,
+                object,
+            ],
+            float,
+        ] = defaultdict(
+            float
+        )
 
         document_lookup: dict[
-            tuple[object, object],
+            tuple[
+                object,
+                object,
+            ],
             Document,
         ] = {}
 
-        for rank, document in enumerate(
-            vector_documents,
-            start=1,
-        ):
-            key = self._key(
-                document
-            )
+        rankings = (
+            (
+                vector_documents,
+                self.vector_weight,
+            ),
+            (
+                [
+                    document
+                    for document, _ in lexical_documents
+                ],
+                self.lexical_weight,
+            ),
+        )
 
-            document_lookup[key] = document
+        for ranked_documents, weight in rankings:
+            if weight == 0:
+                continue
 
-            scores[key] += (
-                0.6 / rank
-            )
+            seen_in_ranking: set[
+                tuple[
+                    object,
+                    object,
+                ]
+            ] = set()
 
-        for rank, (document, _) in enumerate(
-            lexical_documents,
-            start=1,
-        ):
-            key = self._key(
-                document
-            )
+            for rank, document in enumerate(
+                ranked_documents,
+                start=1,
+            ):
+                key = self._key(
+                    document
+                )
 
-            document_lookup.setdefault(
-                key,
-                document,
-            )
+                if key in seen_in_ranking:
+                    continue
 
-            scores[key] += (
-                0.4 / rank
-            )
+                seen_in_ranking.add(
+                    key
+                )
+
+                document_lookup.setdefault(
+                    key,
+                    document,
+                )
+
+                scores[key] += (
+                    weight
+                    / (
+                        self.rrf_k + rank
+                    )
+                )
 
         ranked_documents = [
             (
@@ -201,7 +288,10 @@ class HybridRetriever:
     @staticmethod
     def _key(
         document: Document,
-    ) -> tuple[object, object]:
+    ) -> tuple[
+        object,
+        object,
+    ]:
         return (
             document.metadata.get(
                 "source"

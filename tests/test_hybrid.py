@@ -347,3 +347,315 @@ class HybridRetrieverTests(
                 document,
             ],
         )
+    def test_rrf_prioritizes_documents_found_by_both_retrievers(
+        self,
+    ) -> None:
+        vector_only = self.make_document(
+            "Semantic-only result.",
+            "document:20",
+        )
+
+        shared = self.make_document(
+            "Result found by both retrieval methods.",
+            "document:21",
+        )
+
+        lexical_only = self.make_document(
+            "Keyword-only result.",
+            "document:22",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+        )
+
+        ranked = retriever._reciprocal_rank_fusion(
+            [
+                vector_only,
+                shared,
+            ],
+            [
+                (
+                    lexical_only,
+                    100.0,
+                ),
+                (
+                    shared,
+                    1.0,
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            [
+                document
+                for document, _ in ranked
+            ],
+            [
+                shared,
+                vector_only,
+                lexical_only,
+            ],
+        )
+
+    def test_rrf_applies_expected_weighted_formula(
+        self,
+    ) -> None:
+        vector_only = self.make_document(
+            "Vector result.",
+            "document:23",
+        )
+
+        shared = self.make_document(
+            "Shared result.",
+            "document:24",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+            rrf_k=60,
+            vector_weight=0.6,
+            lexical_weight=0.4,
+        )
+
+        ranked = retriever._reciprocal_rank_fusion(
+            [
+                vector_only,
+                shared,
+            ],
+            [
+                (
+                    shared,
+                    9.0,
+                ),
+            ],
+        )
+
+        scores = {
+            document.metadata[
+                "source"
+            ]: score
+            for document, score in ranked
+        }
+
+        self.assertAlmostEqual(
+            scores[
+                "document:23"
+            ],
+            0.6 / 61,
+        )
+
+        self.assertAlmostEqual(
+            scores[
+                "document:24"
+            ],
+            (
+                0.6 / 62
+            )
+            +
+            (
+                0.4 / 61
+            ),
+        )
+
+    def test_rrf_merges_duplicate_chunks_across_retrieval_paths(
+        self,
+    ) -> None:
+        vector_document = self.make_document(
+            "Shared contract information.",
+            "document:25",
+            chunk_index=3,
+        )
+
+        lexical_document = self.make_document(
+            "Shared contract information.",
+            "document:25",
+            chunk_index=3,
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+        )
+
+        ranked = retriever._reciprocal_rank_fusion(
+            [
+                vector_document,
+            ],
+            [
+                (
+                    lexical_document,
+                    5.0,
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            len(
+                ranked
+            ),
+            1,
+        )
+
+        self.assertIs(
+            ranked[0][0],
+            vector_document,
+        )
+
+        self.assertAlmostEqual(
+            ranked[0][1],
+            1 / 61,
+        )
+
+    def test_rrf_ignores_duplicate_chunks_within_one_ranking(
+        self,
+    ) -> None:
+        document = self.make_document(
+            "Repeated semantic result.",
+            "document:26",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+        )
+
+        ranked = retriever._reciprocal_rank_fusion(
+            [
+                document,
+                document,
+            ],
+            [],
+        )
+
+        self.assertEqual(
+            len(
+                ranked
+            ),
+            1,
+        )
+
+        self.assertAlmostEqual(
+            ranked[0][1],
+            0.6 / 61,
+        )
+
+    def test_rrf_respects_custom_retrieval_weights(
+        self,
+    ) -> None:
+        vector_document = self.make_document(
+            "Semantic result.",
+            "document:27",
+        )
+
+        lexical_document = self.make_document(
+            "Keyword result.",
+            "document:28",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+            vector_weight=0.1,
+            lexical_weight=0.9,
+        )
+
+        ranked = retriever._reciprocal_rank_fusion(
+            [
+                vector_document,
+            ],
+            [
+                (
+                    lexical_document,
+                    0.1,
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            ranked[0][0],
+            lexical_document,
+        )
+
+    def test_rrf_skips_retrieval_paths_with_zero_weight(
+        self,
+    ) -> None:
+        vector_document = self.make_document(
+            "Semantic result.",
+            "document:29",
+        )
+
+        lexical_document = self.make_document(
+            "Keyword result.",
+            "document:30",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+            vector_weight=0.0,
+            lexical_weight=1.0,
+        )
+
+        ranked = retriever._reciprocal_rank_fusion(
+            [
+                vector_document,
+            ],
+            [
+                (
+                    lexical_document,
+                    3.0,
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            [
+                document
+                for document, _ in ranked
+            ],
+            [
+                lexical_document,
+            ],
+        )
+
+    def test_rrf_rejects_invalid_fusion_settings(
+        self,
+    ) -> None:
+        invalid_settings = [
+            {
+                "rrf_k": 0,
+            },
+            {
+                "vector_weight": -0.1,
+            },
+            {
+                "lexical_weight": -0.1,
+            },
+            {
+                "vector_weight": 0.0,
+                "lexical_weight": 0.0,
+            },
+        ]
+
+        for settings in invalid_settings:
+            with self.subTest(
+                settings=settings
+            ):
+                with self.assertRaises(
+                    ValueError
+                ):
+                    HybridRetriever(
+                        FakeVectorStore(
+                            []
+                        ),
+                        **settings,
+                    )
