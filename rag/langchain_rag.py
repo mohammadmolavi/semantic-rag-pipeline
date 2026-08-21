@@ -147,6 +147,16 @@ class LangChainRagPipeline:
 
     def ask(self, question: str) -> LangChainRagAnswer:
         documents = dedupe_documents(self.retriever.invoke(question))
+
+        # Keep semantic retrieval result, but normalize source order for the LLM.
+        documents = sorted(
+            documents,
+            key=lambda document: (
+                str(document.metadata.get("source", "")),
+                int(document.metadata.get("chunk_index", 0)),
+            ),
+        )
+
         documents = documents[:4]
         prompt_value = PROMPT.invoke(
             {

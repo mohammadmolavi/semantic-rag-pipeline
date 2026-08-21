@@ -1,8 +1,10 @@
 #!/bin/sh
 set -eu
 
-python manage.py migrate --noinput
-python manage.py ensure_superuser
-python manage.py load_sample_data
+docker compose up -d postgres
 
-exec python manage.py runserver 0.0.0.0:8000
+.venv/bin/python manage.py migrate --noinput
+.venv/bin/python manage.py ensure_superuser
+.venv/bin/python manage.py load_sample_data
+
+exec .venv/bin/python manage.py runserver 0.0.0.0:8000

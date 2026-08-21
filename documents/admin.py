@@ -18,12 +18,34 @@ class QuestionAdmin(admin.ModelAdmin):
     list_display = ("short_question", "document", "created_at")
     list_filter = ("document", "created_at")
     search_fields = ("question", "answer")
-    readonly_fields = ("answer", "formatted_sources", "created_at")
-    fields = ("document", "question", "answer", "formatted_sources", "created_at")
-
+    readonly_fields = ("formatted_answer", "formatted_sources", "created_at")
+    fields = (
+        "document",
+        "question",
+        "formatted_answer",
+        "formatted_sources",
+        "created_at"
+    )
     @admin.display(description="Question")
     def short_question(self, obj: Question) -> str:
         return str(obj)
+
+    @admin.display(description="Answer")
+    def formatted_answer(self, obj):
+        return format_html(
+            """
+            <div style="
+                direction:rtl;
+                text-align:right;
+                unicode-bidi:plaintext;
+                white-space:pre-wrap;
+                line-height:2;
+            ">
+            {}
+            </div>
+            """,
+            obj.answer or ""
+        )
 
     @admin.display(description="Sources")
     def formatted_sources(self, obj: Question) -> str:
@@ -39,7 +61,18 @@ class QuestionAdmin(admin.ModelAdmin):
                 )
             )
         return format_html(
-            "<pre style=\"white-space: pre-wrap;\">{}</pre>",
+            """
+            <div style="
+                direction:ltr;
+                text-align:left;
+                unicode-bidi:plaintext;
+                white-space:pre-wrap;
+                font-family:monospace;
+                line-height:1.8;
+            ">
+                {}
+            </div>
+            """,
             "\n\n---\n\n".join(blocks),
         )
 

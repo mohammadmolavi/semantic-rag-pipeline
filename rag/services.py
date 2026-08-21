@@ -51,6 +51,14 @@ def ask_question(
 
 
 def serialize_sources(documents: list[Document]) -> list[dict[str, object]]:
+    ordered_documents = sorted(
+        documents,
+        key=lambda document: (
+            str(document.metadata.get("source", "")),
+            int(document.metadata.get("chunk_index", 0)),
+        ),
+    )
+
     return [
         {
             "chunk_index": document.metadata.get("chunk_index"),
@@ -58,5 +66,5 @@ def serialize_sources(documents: list[Document]) -> list[dict[str, object]]:
             "content": document.page_content,
             "citation": document.metadata.get("citation"),
         }
-        for document in documents
+        for document in ordered_documents
     ]
