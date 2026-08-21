@@ -261,3 +261,89 @@ class HybridRetrieverTests(
                 vector_document,
             ],
         )
+    def test_bm25_matches_arabic_and_persian_character_variants(
+        self,
+    ) -> None:
+        document = self.make_document(
+            "راهنمای كتابخانه مرکزی",
+            "document:10",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+            lexical_documents=[
+                document,
+            ],
+            final_k=1,
+        )
+
+        results = retriever.invoke(
+            "کتابخانه"
+        )
+
+        self.assertEqual(
+            results,
+            [
+                document,
+            ],
+        )
+
+    def test_bm25_matches_persian_and_arabic_digits(
+        self,
+    ) -> None:
+        document = self.make_document(
+            "شماره قرارداد ٤٥٦",
+            "document:11",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+            lexical_documents=[
+                document,
+            ],
+            final_k=1,
+        )
+
+        results = retriever.invoke(
+            "۴۵۶"
+        )
+
+        self.assertEqual(
+            results,
+            [
+                document,
+            ],
+        )
+
+    def test_bm25_matches_half_space_and_regular_space(
+        self,
+    ) -> None:
+        document = self.make_document(
+            "سامانه به روز می\u200cشود",
+            "document:12",
+        )
+
+        retriever = HybridRetriever(
+            FakeVectorStore(
+                []
+            ),
+            lexical_documents=[
+                document,
+            ],
+            final_k=1,
+        )
+
+        results = retriever.invoke(
+            "می شود"
+        )
+
+        self.assertEqual(
+            results,
+            [
+                document,
+            ],
+        )
