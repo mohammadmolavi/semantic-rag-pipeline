@@ -1,57 +1,45 @@
 from dotenv import load_dotenv
-import os
-import requests
 
-load_dotenv()
-
-API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-if not API_KEY:
-    raise RuntimeError("OPENROUTER_API_KEY Not Found!")
+from rag.llm import OpenRouterClient
 
 
-url = "https://openrouter.ai/api/v1/chat/completions"
+def main() -> None:
+    load_dotenv()
 
+    client = OpenRouterClient.from_env()
 
-headers = {
-    "Authorization": f"Bearer {API_KEY}",
-    "Content-Type": "application/json",
-}
-
-payload = {
-    "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
-    "messages": [
-        {
-            "role": "system",
-            "content": "You are a helpful assistant. Answer in Persian.",
-        },
-        {
-            "role": "user",
-            "content": "در سه جمله توضیح بده مدل زبانی بزرگ چیست.",
-        },
-    ],
-    "temperature": 0.7,
-    "max_tokens": 300,
-}
-
-try:
-    response = requests.post(
-        url,
-        headers=headers,
-        json=payload,
-        timeout=60,
+    system_prompt = (
+        "You are a helpful assistant. "
+        "Answer only in Persian."
     )
 
-    response.raise_for_status()
-    result = response.json()
+    user_prompt = (
+        "در سه جمله توضیح بده مدل زبانی بزرگ چیست."
+    )
 
-    print("Selected Model is:", result.get("model", "Unknown"))
+    print(
+        "Selected model:",
+        client.model,
+    )
+
+    try:
+        answer = client.answer(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+
+    except Exception as error:
+        print(
+            "Communication error:",
+            error,
+        )
+
+        raise
+
     print("\nAnswer:")
-    print(result["choices"][0]["message"]["content"])
 
-except requests.HTTPError:
-    print("API Error:", response.status_code)
-    print(response.text)
+    print(answer)
 
-except requests.RequestException as error:
-    print("Communication Error:", error)
+
+if __name__ == "__main__":
+    main()

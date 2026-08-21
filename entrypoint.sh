@@ -1,10 +1,14 @@
 #!/bin/sh
 set -eu
 
-docker compose up -d postgres
+echo "Applying database migrations..."
+python manage.py migrate --noinput
 
-.venv/bin/python manage.py migrate --noinput
-.venv/bin/python manage.py ensure_superuser
-.venv/bin/python manage.py load_sample_data
+echo "Creating or updating the admin user..."
+python manage.py ensure_superuser
 
-exec .venv/bin/python manage.py runserver 0.0.0.0:8000
+echo "Loading sample documents..."
+python manage.py load_sample_data
+
+echo "Starting Django development server..."
+exec python manage.py runserver 0.0.0.0:8000
