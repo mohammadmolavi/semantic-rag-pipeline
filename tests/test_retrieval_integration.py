@@ -30,13 +30,13 @@ from rag.services import serialize_sources
 
 
 CONCEPT_GROUPS = (
-    frozenset({"automobile", "car", "vehicle", "Ø®ÙˆØ¯Ø±Ùˆ", "Ù…Ø§Ø´ÛŒÙ†"}),
-    frozenset({"invoice", "billing", "payment", "ÙØ§Ú©ØªÙˆØ±", "Ù¾Ø±Ø¯Ø§Ø®Øª", "Ù…Ø¨Ù„Øº"}),
-    frozenset({"contract", "agreement", "Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯", "ØªÙˆØ§ÙÙ‚"}),
-    frozenset({"cloud", "storage", "backup", "Ø§Ø¨Ø±ÛŒ", "Ø°Ø®ÛŒØ±Ù‡", "Ù¾Ø´ØªÛŒØ¨Ø§Ù†"}),
-    frozenset({"security", "password", "login", "Ø§Ù…Ù†ÛŒØª", "Ø±Ù…Ø²", "ÙˆØ±ÙˆØ¯"}),
-    frozenset({"delivery", "shipment", "order", "Ø§Ø±Ø³Ø§Ù„", "Ø³ÙØ§Ø±Ø´"}),
-    frozenset({"penalty", "fine", "Ø¬Ø±ÛŒÙ…Ù‡", "Ø¯ÛŒØ±Ú©Ø±Ø¯"}),
+    frozenset({"automobile", "car", "vehicle", "خودرو", "ماشین"}),
+    frozenset({"invoice", "billing", "payment", "فاکتور", "پرداخت", "مبلغ"}),
+    frozenset({"contract", "agreement", "قرارداد", "توافق"}),
+    frozenset({"cloud", "storage", "backup", "ابری", "ذخیره", "پشتیبان"}),
+    frozenset({"security", "password", "login", "امنیت", "رمز", "ورود"}),
+    frozenset({"delivery", "shipment", "order", "ارسال", "سفارش"}),
+    frozenset({"penalty", "fine", "جریمه", "دیرکرد"}),
 )
 
 REFERENCE_RE = re.compile(r"[A-Za-z]{2,}-\d{2,}")
@@ -256,7 +256,7 @@ class RealBM25Tests(unittest.TestCase):
 
     def test_persian_arabic_digits_and_half_spaces_share_the_same_index(self) -> None:
         document = make_document(
-            "Ø´Ù…Ø§Ø±Ù‡ Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯ Ù¤Ù¥Ù¦ Ø«Ø¨Øª Ù…ÛŒ\u200cØ´ÙˆØ¯.",
+            "شماره قرارداد ٤٥٦ ثبت می\u200cشود.",
             "document:persian",
         )
         retriever = HybridRetriever(
@@ -264,7 +264,7 @@ class RealBM25Tests(unittest.TestCase):
             lexical_documents=[document],
         )
 
-        results = retriever._bm25_search("Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯ Û´ÛµÛ¶ Ù…ÛŒ Ø´ÙˆØ¯")
+        results = retriever._bm25_search("قرارداد ۴۵۶ می شود")
 
         self.assertEqual(len(results), 1)
         self.assertIs(results[0][0], document)
@@ -556,10 +556,10 @@ class CrossEncoderIntegrationTests(unittest.TestCase):
     def test_question_and_original_unicode_content_are_passed_without_mutation(
         self,
     ) -> None:
-        question = "Ø´Ù…Ø§Ø±Ù‡ Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯ Û´ÛµÛ¶ Ú†ÛŒØ³ØªØŸ"
+        question = "شماره قرارداد ۴۵۶ چیست؟"
         documents = [
-            make_document("Ø´Ù…Ø§Ø±Ù‡ Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯ Ù¤Ù¥Ù¦ Ø§Ø³Øª.", "document:persian"),
-            make_document("Ø±Ø§Ù‡Ù†Ù…Ø§ÛŒ Ù¾Ø±Ø¯Ø§Ø®Øª.", "document:payment"),
+            make_document("شماره قرارداد ٤٥٦ است.", "document:persian"),
+            make_document("راهنمای پرداخت.", "document:payment"),
         ]
         model = DeterministicCrossEncoder()
 
@@ -640,17 +640,17 @@ class StructuredDocumentRetrievalIntegrationTests(unittest.TestCase):
         from docx import Document as DocxDocument
 
         document = DocxDocument()
-        document.add_heading("Ø´Ø±Ø§ÛŒØ· Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯", level=1)
-        document.add_heading("Ù¾Ø±Ø¯Ø§Ø®Øª", level=2)
+        document.add_heading("شرایط قرارداد", level=1)
+        document.add_heading("پرداخت", level=2)
 
         table = document.add_table(rows=2, cols=2)
-        table.cell(0, 0).text = "Ú©Ø¯ Ø³ÙØ§Ø±Ø´"
-        table.cell(0, 1).text = "Ù…Ø¨Ù„Øº"
+        table.cell(0, 0).text = "کد سفارش"
+        table.cell(0, 1).text = "مبلغ"
         table.cell(1, 0).text = "ZX-9182"
-        table.cell(1, 1).text = "ÛµÛ° Ù…ÛŒÙ„ÛŒÙˆÙ† ØªÙˆÙ…Ø§Ù†"
+        table.cell(1, 1).text = "۵۰ میلیون تومان"
 
-        document.add_heading("Ø§Ù…Ù†ÛŒØª", level=2)
-        document.add_paragraph("Ø±Ù…Ø² ÙˆØ±ÙˆØ¯ Ø¨Ø§ÛŒØ¯ Ù…Ø­Ø±Ù…Ø§Ù†Ù‡ Ø¨Ø§Ù‚ÛŒ Ø¨Ù…Ø§Ù†Ø¯.")
+        document.add_heading("امنیت", level=2)
+        document.add_paragraph("رمز ورود باید محرمانه باقی بماند.")
         document.save(path)
 
     def test_docx_table_is_searchable_through_complete_hybrid_pipeline(self) -> None:
@@ -670,11 +670,11 @@ class StructuredDocumentRetrievalIntegrationTests(unittest.TestCase):
             model = DeterministicCrossEncoder()
 
             with patch("rag.reranking._load_cross_encoder", return_value=model):
-                results = retriever.invoke("Ù…Ø¨Ù„Øº Ø³ÙØ§Ø±Ø´ ZX-9182 Ú†Ù‚Ø¯Ø± Ø§Ø³ØªØŸ")
+                results = retriever.invoke("مبلغ سفارش ZX-9182 چقدر است؟")
 
         self.assertEqual(len(results), 1)
-        self.assertIn("ÛµÛ° Ù…ÛŒÙ„ÛŒÙˆÙ† ØªÙˆÙ…Ø§Ù†", results[0].page_content)
-        self.assertEqual(results[0].metadata["section_path"], "Ø´Ø±Ø§ÛŒØ· Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯ > Ù¾Ø±Ø¯Ø§Ø®Øª")
+        self.assertIn("۵۰ میلیون تومان", results[0].page_content)
+        self.assertEqual(results[0].metadata["section_path"], "شرایط قرارداد > پرداخت")
 
     def test_serialized_reranked_source_keeps_original_section_and_citation(
         self,
@@ -692,8 +692,8 @@ class StructuredDocumentRetrievalIntegrationTests(unittest.TestCase):
             serialized = serialize_sources(retriever.invoke("ZX-9182"))
 
         self.assertEqual(serialized[0]["source"], "document:contract")
-        self.assertEqual(serialized[0]["section"], "Ø´Ø±Ø§ÛŒØ· Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯ > Ù¾Ø±Ø¯Ø§Ø®Øª")
-        self.assertIn("Ø´Ø±Ø§ÛŒØ· Ù‚Ø±Ø§Ø±Ø¯Ø§Ø¯ > Ù¾Ø±Ø¯Ø§Ø®Øª", serialized[0]["citation"])
+        self.assertEqual(serialized[0]["section"], "شرایط قرارداد > پرداخت")
+        self.assertIn("شرایط قرارداد > پرداخت", serialized[0]["citation"])
 
 
 @unittest.skipUnless(

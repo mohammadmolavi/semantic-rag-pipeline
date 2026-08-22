@@ -1,0 +1,336 @@
+openapi: 3.0.3
+info:
+  title: Roshan RAG Document Question Answering API
+  version: 1.0.0
+  description: >-
+    Upload multilingual documents, retrieve answers with hybrid semantic/BM25
+    search and reranking, and inspect grounded question history.
+servers:
+  - url: http://localhost:8000
+tags:
+  - name: Documents
+    description: Upload, inspect, update, and delete source documents.
+  - name: Questions
+    description: Generate grounded answers and inspect question history.
+paths:
+  /api/documents/:
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: List uploaded documents.
+      responses:
+        '200':
+          description: Documents ordered from newest to oldest.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+    post:
+      tags: [Documents]
+      operationId: uploadDocument
+      summary: Upload a DOCX, TXT, or PDF document.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentUpload'
+      responses:
+        '201':
+          description: Uploaded and indexed document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /api/documents/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Retrieve one document including its extracted text.
+      responses:
+        '200':
+          description: Matching document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Documents]
+      operationId: replaceDocument
+      summary: Replace a document and reindex its contents.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentUpload'
+      responses:
+        '200':
+          description: Updated document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Documents]
+      operationId: updateDocument
+      summary: Update a document title or replace its file.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentPatch'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentPatch'
+      responses:
+        '200':
+          description: Updated document.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Delete a document, its uploaded file, and its vector chunks.
+      responses:
+        '204':
+          description: Document deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/ask/:
+    post:
+      tags: [Questions]
+      operationId: askQuestion
+      summary: Generate and save a grounded answer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskRequest'
+            examples:
+              globalSearch:
+                summary: Search all indexed documents.
+                value:
+                  question: فاکتور INV-2026-0456 چه مبلغی دارد؟
+                  top_k: 4
+              documentSearch:
+                summary: Restrict retrieval to a selected document.
+                value:
+                  question: زمان پاسخ اولیه پشتیبانی Enterprise چقدر است؟
+                  document_id: 3
+                  top_k: 2
+      responses:
+        '201':
+          description: Saved question, generated answer, and reranked citations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+  /api/history/:
+    get:
+      tags: [Questions]
+      operationId: listQuestionHistory
+      summary: List previous questions and their answers.
+      responses:
+        '200':
+          description: Questions ordered from newest to oldest.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Question'
+  /api/history/{id}/:
+    parameters:
+      - $ref: '#/components/parameters/ResourceId'
+    get:
+      tags: [Questions]
+      operationId: getQuestionHistory
+      summary: Retrieve one saved answer and its source citations.
+      responses:
+        '200':
+          description: Matching question and answer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: Database identifier of the requested resource.
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    ValidationError:
+      description: Invalid request fields or an unknown selected document.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+    NotFound:
+      description: Requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: string
+                example: Not found.
+  schemas:
+    DocumentUpload:
+      type: object
+      required: [title, file]
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          example: راهنمای استفاده از ownCloud
+        file:
+          type: string
+          format: binary
+          description: A DOCX, TXT, or PDF document.
+    DocumentPatch:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        file:
+          type: string
+          format: binary
+    Document:
+      type: object
+      required: [id, title, file, text, chunk_count, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          example: 2
+        title:
+          type: string
+          maxLength: 255
+          example: راهنمای استفاده از ownCloud
+        file:
+          type: string
+          format: uri
+          example: http://localhost:8000/media/documents/owncloud_user_guide_fa.docx
+        text:
+          type: string
+          readOnly: true
+          description: Extracted original document text, headings, and tables.
+        chunk_count:
+          type: integer
+          minimum: 0
+          readOnly: true
+          example: 4
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    AskRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          example: مبلغ ماهانه پلن حرفه‌ای Pro چقدر است؟
+        document_id:
+          type: integer
+          nullable: true
+          description: Omit or use null to search across every document.
+          example: 2
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 4
+    Source:
+      type: object
+      required: [chunk_index, source, content, citation]
+      properties:
+        chunk_index:
+          type: integer
+          minimum: 0
+          example: 1
+        source:
+          type: string
+          example: document:3
+        content:
+          type: string
+          description: Original source chunk content.
+        citation:
+          type: string
+          description: Human-readable source and chunk citation.
+        section:
+          type: string
+          description: Optional hierarchical section path.
+    Question:
+      type: object
+      required: [id, document, question, answer, sources, created_at]
+      properties:
+        id:
+          type: integer
+          readOnly: true
+          example: 8
+        document:
+          type: integer
+          nullable: true
+          example: 3
+        question:
+          type: string
+          example: زمان پاسخ اولیه پشتیبانی Enterprise چقدر است؟
+        answer:
+          type: string
+          readOnly: true
+          example: زمان پاسخ اولیه پشتیبانی Enterprise برابر با ۳۰ دقیقه است.
+        sources:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/Source'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+    ValidationError:
+      type: object
+      additionalProperties:
+        oneOf:
+          - type: string
+          - type: array
+            items:
+              type: string

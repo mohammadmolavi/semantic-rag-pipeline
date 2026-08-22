@@ -1,0 +1,56 @@
+[
+  {
+    "question": "مبلغ ماهانه پلن حرفه‌ای Pro چقدر است؟",
+    "document": "owncloud_user_guide_fa.docx",
+    "expected_contains": "۴۹۰٬۰۰۰ تومان",
+    "section": "پلن‌ها و فضای ذخیره‌سازی"
+  },
+  {
+    "question": "کد سرویس پلن حرفه‌ای چیست؟",
+    "document": "owncloud_user_guide_fa.docx",
+    "expected_contains": "OC-PRO-500",
+    "section": "پلن‌ها و فضای ذخیره‌سازی"
+  },
+  {
+    "question": "تأیید دومرحله‌ای MFA از کدام بخش فعال می‌شود؟",
+    "document": "owncloud_user_guide_fa.docx",
+    "expected_contains": "Settings > Security",
+    "section": "ورود و امنیت حساب"
+  },
+  {
+    "question": "زمان پاسخ اولیه پشتیبانی Enterprise چقدر است؟",
+    "document": "support_and_pricing_fa.docx",
+    "expected_contains": "۳۰ دقیقه",
+    "section": "سطوح پشتیبانی و SLA"
+  },
+  {
+    "question": "شناسه SLA-ENT-247 مربوط به چه سطحی است؟",
+    "document": "support_and_pricing_fa.docx",
+    "expected_contains": "Enterprise",
+    "section": "سطوح پشتیبانی و SLA"
+  },
+  {
+    "question": "فاکتور INV-2026-0456 چه مبلغی دارد؟",
+    "document": "support_and_pricing_fa.docx",
+    "expected_contains": "۴۹۰٬۰۰۰ تومان",
+    "section": "پرداخت و صورت‌حساب"
+  },
+  {
+    "question": "نسخه پشتیبان اطلاعات چند روز نگهداری می‌شود؟",
+    "document": "support_and_pricing_fa.docx",
+    "expected_contains": "۳۰ روز",
+    "section": "پشتیبان‌گیری و بازیابی اطلاعات"
+  },
+  {
+    "question": "What rendering technique does NeRF use?",
+    "document": "neural_radiance_fields.docx",
+    "expected_contains": "volumetric rendering",
+    "section": "Volumetric rendering"
+  },
+  {
+    "question": "پایتخت چین چیست؟",
+    "document": null,
+    "expected_behavior": "insufficient_context",
+    "description": "Unrelated questions must not be answered from these documents."
+  }
+]

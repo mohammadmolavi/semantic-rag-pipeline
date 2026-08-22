@@ -1,42 +1,41 @@
-from pathlib import Path
-
 from django.conf import settings
 from django.core.files import File
-from django.core.management.base import BaseCommand, CommandError
-from docx import Document as DocxDocument
+from django.core.management.base import BaseCommand
 
 from documents.models import Document
-
-
-def write_sample_docx(source_txt: Path, target: Path) -> None:
-    document = DocxDocument()
-    document.add_heading("Neural Radiance Fields", level=1)
-    for paragraph in source_txt.read_text(encoding="utf-8").split("\n\n"):
-        text = paragraph.strip()
-        if text:
-            document.add_paragraph(text)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    document.save(target)
+from documents.sample_data import SAMPLE_DOCUMENTS, ensure_sample_files
 
 
 class Command(BaseCommand):
-    help = "Load the bundled sample .docx into Django."
+    help = "Create and load the bundled multilingual demonstration documents."
 
     def handle(self, *args, **options):
         sample_dir = settings.SAMPLE_DATA_DIR
-        sample_dir.mkdir(parents=True, exist_ok=True)
-        source_txt = settings.BASE_DIR / "txt.txt"
-        sample_docx = sample_dir / "neural_radiance_fields.docx"
-        if not sample_docx.exists():
-            if not source_txt.exists():
-                raise CommandError(f"Missing sample source: {source_txt}")
-            write_sample_docx(source_txt, sample_docx)
+        ensure_sample_files(sample_dir)
+        loaded = 0
+        skipped = 0
 
-        if Document.objects.filter(title="Neural Radiance Fields").exists():
-            self.stdout.write("Sample document already exists.")
-            return
+        for specification in SAMPLE_DOCUMENTS:
+            if Document.objects.filter(title=specification.title).exists():
+                skipped += 1
+                self.stdout.write(f"Already loaded: {specification.title}")
+                continue
 
-        with sample_docx.open("rb") as handle:
-            document = Document(title="Neural Radiance Fields")
-            document.file.save(sample_docx.name, File(handle), save=True)
-        self.stdout.write(self.style.SUCCESS(f"Loaded sample document id={document.pk}."))
+            path = sample_dir / specification.filename
+
+            with path.open("rb") as handle:
+                document = Document(title=specification.title)
+                document.file.save(path.name, File(handle), save=True)
+
+            loaded += 1
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Loaded sample document id={document.pk}: {specification.title}"
+                )
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Sample data ready: {loaded} loaded, {skipped} already present."
+            )
+        )
