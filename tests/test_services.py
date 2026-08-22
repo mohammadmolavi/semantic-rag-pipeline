@@ -89,3 +89,24 @@ class SourceSerializationTests(
                 },
             ],
         )
+
+    def test_serialization_includes_section_when_available(
+        self,
+    ) -> None:
+        document = Document(
+            page_content="Penalty details.",
+            metadata={
+                "source": "document:4",
+                "chunk_index": 1,
+                "citation": "document:4 - Contract > Penalties - chunk 1",
+                "section_path": "Contract > Penalties",
+            },
+        )
+
+        serialized = serialize_sources([document])
+
+        self.assertEqual(serialized[0]["section"], "Contract > Penalties")
+        self.assertEqual(
+            serialized[0]["citation"],
+            "document:4 - Contract > Penalties - chunk 1",
+        )

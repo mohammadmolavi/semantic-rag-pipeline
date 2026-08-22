@@ -1,6 +1,6 @@
 # Roshan RAG
 
-Django document question-answering system. Upload `.docx` or `.txt` files in
+Django document question-answering system. Upload `.docx` , `.txt` , `.pdf` files in
 Admin or through the API, retrieve relevant chunks with LangChain + pgvector,
 and answer questions with a free OpenRouter model.
 
@@ -77,7 +77,7 @@ curl -F "title=Sample" -F "file=@sample_data/neural_radiance_fields.docx" \
 
 ```json
 {
-  "question": "NeRF چیست؟",
+  "question": "NeRF Ú†ÛŒØ³ØªØŸ",
   "document_id": 1,
   "top_k": 4
 }
@@ -98,8 +98,48 @@ The request is stored in history.
 `python manage.py load_sample_data` builds `sample_data/neural_radiance_fields.docx`
 from `txt.txt` and uploads it if it is not already in the database.
 
+## Testing retrieval and reranking
+
+Run all unit and integration tests locally:
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+Run the same test suite inside the application container:
+
+```bash
+docker compose exec web python -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+The integration suite uses the real `rank-bm25` implementation, LangChain's
+`InMemoryVectorStore`, weighted reciprocal rank fusion, the production
+`CrossEncoderReranker`, and actual DOCX extraction. Deterministic embeddings and
+a deterministic scoring model keep the default run independent of PostgreSQL,
+API credentials, network access, and model downloads.
+
+To additionally download and run the actual configured Cross-Encoder model:
+
+```bash
+RUN_REAL_RERANKER_TESTS=1 RERANKER_DEVICE=cpu \
+  python -m unittest tests.test_retrieval_integration.RealCrossEncoderModelTests -v
+```
+
+With Docker:
+
+```bash
+docker compose exec \
+  -e RUN_REAL_RERANKER_TESTS=1 \
+  -e RERANKER_DEVICE=cpu \
+  web python -m unittest \
+  tests.test_retrieval_integration.RealCrossEncoderModelTests -v
+```
+
+The optional model test requires `sentence-transformers` and may download the
+model on its first execution. The default suite intentionally skips this test.
+
 ## CLI demo (optional)
 
 ```bash
-python rag_demo.py ./txt.txt "سوال شما درباره سند چیست؟"
+python rag_demo.py ./txt.txt "Ø³ÙˆØ§Ù„ Ø´Ù…Ø§ Ø¯Ø±Ø¨Ø§Ø±Ù‡ Ø³Ù†Ø¯ Ú†ÛŒØ³ØªØŸ"
 ```
