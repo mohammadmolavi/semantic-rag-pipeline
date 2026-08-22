@@ -763,3 +763,28 @@ class HybridRetrieverTests(
                 ),
                 rerank_k=0,
             )
+
+    def test_zero_vector_weight_does_not_call_vector_store(self) -> None:
+        lexical_document = self.make_document(
+            "The reference is ZX-9182.",
+            "document:1",
+        )
+        vector_store = Mock()
+        vector_store.similarity_search.side_effect = AssertionError(
+            "vector search must be disabled"
+        )
+        retriever = HybridRetriever(
+            vector_store,
+            lexical_documents=[lexical_document],
+            vector_weight=0,
+            lexical_weight=1,
+        )
+
+        self.assertEqual(retriever.invoke("ZX-9182"), [lexical_document])
+        vector_store.similarity_search.assert_not_called()
+
+    def test_candidate_counts_must_be_positive(self) -> None:
+        for setting in ("vector_k", "lexical_k", "final_k"):
+            with self.subTest(setting=setting):
+                with self.assertRaisesRegex(ValueError, setting):
+                    HybridRetriever(FakeVectorStore([]), **{setting: 0})

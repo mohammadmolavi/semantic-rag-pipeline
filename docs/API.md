@@ -103,6 +103,9 @@ An unsupported file extension returns `400 Bad Request`:
 }
 ```
 
+A corrupt file, an empty document, or a scanned PDF with no extractable text
+also returns `400 Bad Request`. Run OCR on image-only PDFs before uploading.
+
 ### Retrieve one document
 
 ```http
@@ -167,7 +170,7 @@ Content-Type: application/json; charset=utf-8
 | Field | Type | Required | Rules |
 | --- | --- | --- | --- |
 | `question` | string | Yes | Non-empty question text. |
-| `document_id` | integer or null | No | Search one document; omit or use `null` to search all documents. |
+| `document_id` | positive integer or null | No | Search one document; omit or use `null` to search all documents. |
 | `top_k` | integer | No | Number of returned chunks, from 1 to 10; defaults to 4. |
 
 Search all indexed documents:
@@ -268,6 +271,18 @@ Unknown document:
 
 Each of these responses uses `400 Bad Request`.
 
+If retrieval, reranking configuration, or OpenRouter is unavailable, the ask
+endpoint returns `503 Service Unavailable`:
+
+```json
+{
+  "detail": "OPENROUTER_API_KEY is missing or still uses a placeholder."
+}
+```
+
+The question is saved to history only after retrieval and answer generation
+succeed, so a failed provider request does not leave an empty history record.
+
 ## Question history
 
 ### List previous questions
@@ -296,7 +311,22 @@ History endpoints are read-only. Creating an answer is done through
 | `400 Bad Request` | Missing or invalid fields, unsupported file, or unknown `document_id`. |
 | `404 Not Found` | A document or history resource does not exist. |
 | `405 Method Not Allowed` | The endpoint does not implement the requested HTTP method. |
-| `500 Internal Server Error` | An unhandled database, model, indexing, or OpenRouter failure. |
+| `503 Service Unavailable` | Retrieval, reranking configuration, or OpenRouter is unavailable. |
+| `500 Internal Server Error` | An unhandled database, storage, or indexing failure. |
 
 For API errors, inspect `docker compose logs -f web` and verify the database,
 OpenRouter configuration, document index, and reranking model settings.
+
+## Retrieval evaluation
+
+Retrieval evaluation is an offline management command rather than a public API
+endpoint. It never calls OpenRouter. Run the bundled BM25 baseline with:
+
+```bash
+python manage.py evaluate_retrieval --mode bm25 --top-k 4
+```
+
+Use `--mode hybrid` to evaluate the live PostgreSQL semantic index, weighted
+RRF, BM25, and configured Cross-Encoder. The report includes Hit Rate, MRR,
+mean Recall, mean Precision, per-query ranks, and a separate negative rejection
+rate for `insufficient_context` examples.

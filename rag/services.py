@@ -1,3 +1,5 @@
+import logging
+
 from functools import lru_cache
 
 from langchain_core.documents import Document
@@ -16,6 +18,9 @@ from .langchain_rag import (
 
 from .llm import OpenRouterClient
 from .reranking import CrossEncoderReranker
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -43,21 +48,30 @@ def reindex_source(
 ) -> int:
     vector_store = get_vector_store()
 
-    if previous_chunk_count:
+    if not text.strip():
         delete_source_chunks(
             vector_store,
             source,
             previous_chunk_count,
         )
-
-    if not text.strip():
         return 0
 
-    return index_text(
+    chunk_count = index_text(
         vector_store,
         text,
         source,
     )
+
+    stale_chunk_count = max(previous_chunk_count - chunk_count, 0)
+    if stale_chunk_count:
+        delete_source_chunks(
+            vector_store,
+            source,
+            stale_chunk_count,
+            start=chunk_count,
+        )
+
+    return chunk_count
 
 
 def delete_source(
@@ -140,30 +154,38 @@ def ask_question(
     source: str | None = None,
     top_k: int = 4,
 ) -> LangChainRagAnswer:
-    lexical_documents = (
-        get_lexical_documents(
-            source
+    try:
+        lexical_documents = (
+            get_lexical_documents(
+                source
+            )
         )
-    )
 
-    retriever = build_retriever(
-        get_vector_store(),
-        source=source,
-        top_k=top_k,
-        lexical_documents=(
-            lexical_documents
-        ),
-        reranker=get_reranker(),
-    )
+        retriever = build_retriever(
+            get_vector_store(),
+            source=source,
+            top_k=top_k,
+            lexical_documents=(
+                lexical_documents
+            ),
+            reranker=get_reranker(),
+        )
 
-    pipeline = LangChainRagPipeline(
-        retriever,
-        OpenRouterClient.from_env(),
-    )
+        pipeline = LangChainRagPipeline(
+            retriever,
+            OpenRouterClient.from_env(),
+        )
 
-    return pipeline.ask(
-        question
-    )
+        return pipeline.ask(
+            question
+        )
+    except (RuntimeError, ValueError):
+        raise
+    except Exception as error:
+        LOGGER.exception("Retrieval or answer generation failed unexpectedly")
+        raise RuntimeError(
+            "Retrieval or answer generation is temporarily unavailable."
+        ) from error
 
 
 def serialize_sources(

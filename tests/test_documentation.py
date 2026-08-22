@@ -33,6 +33,7 @@ class DocumentationTests(unittest.TestCase):
             "## Local development",
             "## Configuration",
             "## Bundled sample documents",
+            "## Retrieval evaluation",
             "## Django Admin workflow",
             "## REST API",
             "## Test suite",
@@ -59,8 +60,10 @@ class DocumentationTests(unittest.TestCase):
     def test_openapi_request_constraints_match_the_ask_serializer(self) -> None:
         request = self.schema["components"]["schemas"]["AskRequest"]
         top_k = request["properties"]["top_k"]
+        document_id = request["properties"]["document_id"]
 
         self.assertEqual(request["required"], ["question"])
+        self.assertEqual(document_id["minimum"], 1)
         self.assertEqual(top_k["minimum"], 1)
         self.assertEqual(top_k["maximum"], 10)
         self.assertEqual(top_k["default"], 4)
@@ -132,6 +135,16 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("unauthenticated", self.readme)
         self.assertIn("AllowAny", self.api_docs)
 
+    def test_retrieval_evaluation_is_documented_without_an_llm_dependency(self) -> None:
+        self.assertIn("evaluate_retrieval --mode bm25", self.readme)
+        self.assertIn("evaluate_retrieval --mode hybrid", self.readme)
+        self.assertIn("Hit Rate@K", self.readme)
+        self.assertIn("never calls OpenRouter", self.api_docs)
+        self.assertIn(
+            "503",
+            self.schema["paths"]["/api/ask/"]["post"]["responses"],
+        )
+
     def test_example_configuration_covers_documented_runtime_controls(self) -> None:
         environment = (PROJECT_ROOT / ".env.example").read_text(encoding="utf-8")
 
@@ -148,4 +161,3 @@ class DocumentationTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertRegex(environment, rf"(?m)^{key}=")
                 self.assertIn(f"`{key}`", self.readme)
-

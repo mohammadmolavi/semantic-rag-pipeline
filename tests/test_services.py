@@ -1,8 +1,11 @@
 import unittest
 
+from unittest.mock import Mock, patch
+
 from langchain_core.documents import Document
 
-from rag.services import serialize_sources
+from rag.llm import OpenRouterClient
+from rag.services import ask_question, serialize_sources
 
 
 class SourceSerializationTests(
@@ -110,3 +113,25 @@ class SourceSerializationTests(
             serialized[0]["citation"],
             "document:4 - Contract > Penalties - chunk 1",
         )
+
+
+class ServiceFailureTests(unittest.TestCase):
+    def test_empty_provider_answer_is_rejected(self) -> None:
+        client = object.__new__(OpenRouterClient)
+        client.model = "fixture-model"
+        client._chain = Mock()
+        client._chain.invoke.return_value = "  <think>internal</think>  "
+
+        with self.assertRaisesRegex(RuntimeError, "empty answer"):
+            client.answer("system", "user")
+
+    def test_unexpected_retrieval_error_is_wrapped_as_runtime_error(self) -> None:
+        with (
+            patch(
+                "rag.services.get_lexical_documents",
+                side_effect=OSError("database unavailable"),
+            ),
+            self.assertLogs("rag.services", level="ERROR"),
+            self.assertRaisesRegex(RuntimeError, "temporarily unavailable"),
+        ):
+            ask_question("test")

@@ -139,22 +139,25 @@ class OpenRouterClient:
             "",
         ).strip()
 
-        if not api_key:
+        if not api_key or api_key.casefold() in {"replace-me", "your-key"}:
             raise RuntimeError(
-                "OPENROUTER_API_KEY is not set. "
+                "OPENROUTER_API_KEY is missing or still uses a placeholder. "
                 f"Checked environment variables and: {env_path}"
             )
 
+        model = os.getenv(
+            "OPENROUTER_MODEL",
+            cls.model,
+        ).strip() or cls.model
+        base_url = os.getenv(
+            "OPENROUTER_BASE_URL",
+            cls.base_url,
+        ).strip() or cls.base_url
+
         return cls(
             api_key=api_key,
-            model=os.getenv(
-                "OPENROUTER_MODEL",
-                cls.model,
-            ),
-            base_url=os.getenv(
-                "OPENROUTER_BASE_URL",
-                cls.base_url,
-            ),
+            model=model,
+            base_url=base_url,
         )
 
     def answer(
@@ -176,4 +179,10 @@ class OpenRouterClient:
                 f"for model '{self.model}': {error}"
             ) from error
 
-        return clean_llm_answer(answer)
+        cleaned_answer = clean_llm_answer(answer)
+        if not cleaned_answer:
+            raise RuntimeError(
+                f"OpenRouter returned an empty answer for model '{self.model}'."
+            )
+
+        return cleaned_answer

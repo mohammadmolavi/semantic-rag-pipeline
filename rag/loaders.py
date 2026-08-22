@@ -8,14 +8,17 @@ SUPPORTED_SUFFIXES = {
 }
 
 
+class DocumentLoadError(ValueError):
+    """Raised when a supported document cannot be decoded safely."""
+
+
 def load_text_file(
     path: str | Path,
 ) -> str:
-    return Path(
-        path
-    ).read_text(
-        encoding="utf-8-sig"
-    )
+    try:
+        return Path(path).read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as error:
+        raise DocumentLoadError(f"Could not read TXT document: {error}") from error
 
 
 def _format_docx_paragraph(
@@ -216,36 +219,22 @@ def load_docx(
             "Install python-docx to read .docx files."
         ) from error
 
-    document = Document(
-        path
-    )
+    try:
+        document = Document(path)
+        blocks = []
 
-    blocks = []
+        for block in document.iter_inner_content():
+            if isinstance(block, Paragraph):
+                text = _format_docx_paragraph(block)
+            elif isinstance(block, Table):
+                text = _format_docx_table(block)
+            else:
+                continue
 
-    for block in document.iter_inner_content():
-        if isinstance(
-            block,
-            Paragraph,
-        ):
-            text = _format_docx_paragraph(
-                block
-            )
-
-        elif isinstance(
-            block,
-            Table,
-        ):
-            text = _format_docx_table(
-                block
-            )
-
-        else:
-            continue
-
-        if text:
-            blocks.append(
-                text
-            )
+            if text:
+                blocks.append(text)
+    except Exception as error:
+        raise DocumentLoadError(f"Could not read DOCX document: {error}") from error
 
     return "\n\n".join(
         blocks
@@ -256,23 +245,21 @@ def load_pdf(
     path: str | Path,
 ) -> str:
     try:
-        import fitz
+        import pymupdf
 
     except ImportError as error:
         raise RuntimeError(
             "Install pymupdf to read .pdf files."
         ) from error
 
-    with fitz.open(
-        path
-    ) as document:
-        pages = [
-            page.get_text(
-                "text",
-                sort=True,
-            ).strip()
-            for page in document
-        ]
+    try:
+        with pymupdf.open(path) as document:
+            pages = [
+                page.get_text("text", sort=True).strip()
+                for page in document
+            ]
+    except Exception as error:
+        raise DocumentLoadError(f"Could not read PDF document: {error}") from error
 
     return "\n\n".join(
         page

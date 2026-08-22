@@ -240,11 +240,14 @@ def split_document_text(
 def chunk_ids_for_source(
     source: str,
     chunk_count: int,
+    *,
+    start: int = 0,
 ) -> list[str]:
     return [
         f"{source}:{index}"
         for index in range(
-            chunk_count
+            start,
+            start + chunk_count,
         )
     ]
 
@@ -274,10 +277,13 @@ def delete_source_chunks(
     vector_store,
     source: str,
     chunk_count: int,
+    *,
+    start: int = 0,
 ) -> None:
     ids = chunk_ids_for_source(
         source,
         chunk_count,
+        start=start,
     )
 
     if ids:

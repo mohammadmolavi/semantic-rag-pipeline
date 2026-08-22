@@ -148,6 +148,8 @@ paths:
                 $ref: '#/components/schemas/Question'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/history/:
     get:
       tags: [Questions]
@@ -205,6 +207,17 @@ components:
               detail:
                 type: string
                 example: Not found.
+    ServiceUnavailable:
+      description: Retrieval, reranking configuration, or answer generation is unavailable.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [detail]
+            properties:
+              detail:
+                type: string
+                example: OPENROUTER_API_KEY is missing or still uses a placeholder.
   schemas:
     DocumentUpload:
       type: object
@@ -270,6 +283,7 @@ components:
           example: مبلغ ماهانه پلن حرفه‌ای Pro چقدر است؟
         document_id:
           type: integer
+          minimum: 1
           nullable: true
           description: Omit or use null to search across every document.
           example: 2

@@ -29,6 +29,14 @@ class HybridRetriever:
         reranker: CrossEncoderReranker | None = None,
         rerank_k: int = 12,
     ) -> None:
+        for name, value in (
+            ("vector_k", vector_k),
+            ("lexical_k", lexical_k),
+            ("final_k", final_k),
+        ):
+            if value <= 0:
+                raise ValueError(f"{name} must be greater than zero.")
+
         if rrf_k <= 0:
             raise ValueError(
                 "rrf_k must be greater than zero."
@@ -80,12 +88,16 @@ class HybridRetriever:
         self,
         question: str,
     ) -> list[Document]:
-        vector_documents = self._vector_search(
-            question
+        vector_documents = (
+            self._vector_search(question)
+            if self.vector_weight > 0
+            else []
         )
 
-        lexical_documents = self._bm25_search(
-            question
+        lexical_documents = (
+            self._bm25_search(question)
+            if self.lexical_weight > 0
+            else []
         )
 
         ranked_documents = self._reciprocal_rank_fusion(

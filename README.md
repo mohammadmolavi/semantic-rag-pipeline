@@ -53,11 +53,11 @@ contributions. Reranking runs before the final `top_k` cutoff.
 ```text
 config/                         Django settings and URL configuration
 documents/                      Models, Django Admin, API, and sample data
-documents/management/commands/  Admin bootstrap and sample-data commands
+documents/management/commands/  Admin, sample-data, and retrieval-evaluation commands
 docs/API.md                     Complete human-readable API reference
 docs/openapi.yaml               OpenAPI 3.0 specification
 docs/screenshots/               Screenshots captured from Django Admin
-rag/                            Loaders, chunking, hybrid retrieval, and LLM
+rag/                            Loaders, chunking, hybrid retrieval, evaluation, and LLM
 sample_data/                    Bundled multilingual DOCX files and questions
 tests/                          Unit, integration, and sample-data tests
 docker-compose.yml              PostgreSQL/pgvector and Django services
@@ -105,6 +105,7 @@ Useful container commands:
 ```bash
 docker compose logs -f web
 docker compose exec web python manage.py load_sample_data
+docker compose exec web python manage.py evaluate_retrieval --mode hybrid
 docker compose exec web python manage.py check
 docker compose down
 ```
@@ -185,6 +186,42 @@ What rendering technique does NeRF use?
 
 The pricing and support identifiers are fictional demonstration data, not
 official ownCloud product prices or service commitments.
+
+## Retrieval evaluation
+
+Retrieval can be evaluated independently from answer generation, so neither an
+OpenRouter request nor LLM-as-a-judge is needed. The evaluator reads
+`sample_data/sample_questions.json`, derives relevant chunk IDs from each
+expected answer fragment, and reports `Hit Rate@K`, `MRR@K`, mean `Recall@K`,
+and mean `Precision@K`.
+
+Run the deterministic BM25 baseline without PostgreSQL or model downloads:
+
+```bash
+python manage.py evaluate_retrieval --mode bm25 --top-k 4
+```
+
+Evaluate the live semantic + BM25 + RRF + Cross-Encoder pipeline after the
+sample documents have been indexed:
+
+```bash
+python manage.py evaluate_retrieval --mode hybrid --top-k 4
+```
+
+Useful options:
+
+```bash
+# Compare hybrid retrieval without the Cross-Encoder.
+python manage.py evaluate_retrieval --mode hybrid --no-reranker
+
+# Produce JSON for CI and fail when Hit Rate@4 falls below 90%.
+python manage.py evaluate_retrieval --mode bm25 --json --min-hit-rate 0.90
+```
+
+Positive queries contribute to ranking metrics. Queries labeled
+`insufficient_context` are reported separately as the negative rejection rate.
+That negative metric measures retrieval abstention; factuality and faithfulness
+of the generated answer require a separate answer-level evaluation.
 
 ## Django Admin workflow
 
@@ -268,8 +305,9 @@ docker compose exec web python -m unittest discover -s tests -p 'test_*.py' -v
 
 The default tests use real `rank-bm25`, LangChain's `InMemoryVectorStore`,
 production RRF and reranking code, actual DOCX generation, nested tables,
-Persian normalization, sample data, and source serialization. PostgreSQL,
-OpenRouter credentials, and model downloads are not required for the fast suite.
+Persian normalization, retrieval metrics, sample data, API failure handling,
+file replacement/deletion, and source serialization. PostgreSQL, OpenRouter
+credentials, and model downloads are not required for the fast suite.
 
 Run the optional actual Cross-Encoder model test:
 
@@ -291,10 +329,10 @@ The first optional run can download the configured model.
   model name, and `docker compose logs -f web`.
 - **A document has zero chunks:** verify that `INDEX_DOCUMENTS=true` and that
   the document contains extractable text.
-- **A scanned PDF returns no text:** the current PDF loader extracts embedded
-  text; OCR for image-only PDFs is not included.
-- **Old documents do not include table content:** upload them again or re-save
-  them after deploying the structured DOCX loader.
+- **A scanned PDF upload is rejected:** the PDF loader extracts embedded text;
+  run OCR first because image-only PDFs contain no searchable text.
+- **Old documents do not include table content:** replace or re-upload their
+  files after deploying the structured DOCX loader.
 - **Reranking is too expensive:** set `RERANKER_DEVICE=cpu`, lower
   `RERANKER_BATCH_SIZE`, or set `RERANKER_ENABLED=false`.
 - **Persian text appears corrupted:** keep repository files and API request

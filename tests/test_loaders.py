@@ -358,7 +358,7 @@ class LoaderTests(unittest.TestCase):
     def test_load_pdf_preserves_top_to_bottom_reading_order(
         self,
     ) -> None:
-        import fitz
+        import pymupdf
 
         with tempfile.TemporaryDirectory() as directory:
             path = (
@@ -368,7 +368,7 @@ class LoaderTests(unittest.TestCase):
                 / "ordered.pdf"
             )
 
-            with fitz.open() as document:
+            with pymupdf.open() as document:
                 page = document.new_page()
 
                 page.insert_text(
