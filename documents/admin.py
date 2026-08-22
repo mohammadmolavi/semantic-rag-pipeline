@@ -46,20 +46,55 @@ class QuestionAdmin(admin.ModelAdmin):
             """,
             obj.answer or ""
         )
+    
 
-    @admin.display(description="Sources")
-    def formatted_sources(self, obj: Question) -> str:
+    @admin.display(
+        description="Sources"
+    )
+    def formatted_sources(
+            self,
+            obj: Question,
+    ) -> str:
         if not obj.sources:
             return "—"
+
         blocks = []
+
         for source in obj.sources:
+            section = source.get(
+                "section",
+                "",
+            )
+
+            section_label = (
+                f" | section: {section}"
+                if section
+                else ""
+            )
+
             blocks.append(
-                "chunk {chunk} | {origin}\n{content}".format(
-                    chunk=source.get("chunk_index", "?"),
-                    origin=source.get("source", "unknown"),
-                    content=source.get("content", ""),
+                (
+                    "chunk {chunk} "
+                    "| {origin}"
+                    "{section}\n"
+                    "{content}"
+                ).format(
+                    chunk=source.get(
+                        "chunk_index",
+                        "?",
+                    ),
+                    origin=source.get(
+                        "source",
+                        "unknown",
+                    ),
+                    section=section_label,
+                    content=source.get(
+                        "content",
+                        "",
+                    ),
                 )
             )
+
         return format_html(
             """
             <div style="
@@ -73,7 +108,9 @@ class QuestionAdmin(admin.ModelAdmin):
                 {}
             </div>
             """,
-            "\n\n---\n\n".join(blocks),
+            "\n\n---\n\n".join(
+                blocks
+            ),
         )
 
     def save_model(self, request, obj, form, change):

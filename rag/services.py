@@ -174,8 +174,10 @@ def serialize_sources(
         object,
     ]
 ]:
-    return [
-        {
+    serialized = []
+
+    for document in documents:
+        source = {
             "chunk_index": (
                 document.metadata.get(
                     "chunk_index"
@@ -195,5 +197,18 @@ def serialize_sources(
                 )
             ),
         }
-        for document in documents
-    ]
+
+        section_path = document.metadata.get(
+            "section_path"
+        )
+
+        if section_path:
+            source[
+                "section"
+            ] = section_path
+
+        serialized.append(
+            source
+        )
+
+    return serialized

@@ -6,6 +6,7 @@ from pathlib import Path
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_text_splitters import (
+    MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
 )
 
@@ -24,6 +25,33 @@ DEFAULT_DATABASE_URL = (
 DEFAULT_COLLECTION_NAME = (
     "roshan_rag_chunks"
 )
+
+SECTION_HEADERS = [
+    (
+        "#",
+        "section",
+    ),
+    (
+        "##",
+        "subsection",
+    ),
+    (
+        "###",
+        "subsection_level_3",
+    ),
+    (
+        "####",
+        "subsection_level_4",
+    ),
+    (
+        "#####",
+        "subsection_level_5",
+    ),
+    (
+        "######",
+        "subsection_level_6",
+    ),
+]
 
 
 def langchain_database_url(
@@ -123,21 +151,52 @@ def split_document_text(
     chunk_size: int = 900,
     chunk_overlap: int = 150,
 ) -> list[Document]:
+    if not text.strip():
+        return []
+
+    markdown_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=SECTION_HEADERS,
+        strip_headers=False,
+    )
+
+    sections = markdown_splitter.split_text(
+        text
+    )
+
+    base_metadata = {
+        "source": source,
+        "document_name": Path(
+            source
+        ).name,
+    }
+
+    for section in sections:
+        section.metadata.update(
+            base_metadata
+        )
+
+        section_path = " > ".join(
+            str(
+                section.metadata[key]
+            ).strip()
+            for _, key in SECTION_HEADERS
+            if section.metadata.get(
+                key
+            )
+        )
+
+        if section_path:
+            section.metadata[
+                "section_path"
+            ] = section_path
+
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
 
-    documents = splitter.create_documents(
-        [text],
-        metadatas=[
-            {
-                "source": source,
-                "document_name": Path(
-                    source
-                ).name,
-            }
-        ],
+    documents = splitter.split_documents(
+        sections
     )
 
     for index, document in enumerate(
@@ -152,13 +211,30 @@ def split_document_text(
             source,
         )
 
-        document.metadata[
-            "citation"
-        ] = (
-            f"{document_name} - chunk {index}"
+        section_path = document.metadata.get(
+            "section_path",
+            "",
         )
 
+        if section_path:
+            citation = (
+                f"{document_name} - "
+                f"{section_path} - "
+                f"chunk {index}"
+            )
+
+        else:
+            citation = (
+                f"{document_name} - "
+                f"chunk {index}"
+            )
+
+        document.metadata[
+            "citation"
+        ] = citation
+
     return documents
+
 
 
 def chunk_ids_for_source(
@@ -329,28 +405,48 @@ class LangChainRagPipeline:
 
     @staticmethod
     def _format_documents(
-        documents: list[Document],
+            documents: list[Document],
     ) -> str:
         if not documents:
             return (
                 "No relevant context was found."
             )
 
-        return "\n\n".join(
-            (
-                "[chunk {chunk_index} "
-                "| source: {source}]\n"
-                "{content}"
-            ).format(
-                chunk_index=document.metadata.get(
-                    "chunk_index",
-                    "unknown",
-                ),
-                source=document.metadata.get(
-                    "source",
-                    "unknown",
-                ),
-                content=document.page_content,
+        formatted_documents = []
+
+        for document in documents:
+            chunk_index = document.metadata.get(
+                "chunk_index",
+                "unknown",
             )
-            for document in documents
+
+            source = document.metadata.get(
+                "source",
+                "unknown",
+            )
+
+            section_path = document.metadata.get(
+                "section_path",
+                "",
+            )
+
+            header = (
+                f"[chunk {chunk_index} "
+                f"| source: {source}"
+            )
+
+            if section_path:
+                header += (
+                    f" | section: {section_path}"
+                )
+
+            header += "]"
+
+            formatted_documents.append(
+                f"{header}\n"
+                f"{document.page_content}"
+            )
+
+        return "\n\n".join(
+            formatted_documents
         )
